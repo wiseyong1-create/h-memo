@@ -40,7 +40,7 @@ const store = {
 const MODE_QUERY = TEST_NS ? '&ns=' + encodeURIComponent(TEST_NS) + (SPLIT_SYNC ? '&split=1' : '') : '';
 
 // 이 화면의 판 번호 — 도움말 맨 아래에 보인다(휴대폰이 옛 코드로 도는지 확인용). sw.js 의 CACHE_NAME 과 함께 올린다
-const APP_VERSION = '170';
+const APP_VERSION = '171';
 
 let storageFullAt = 0;
 function onStorageFull(e) {
@@ -55,7 +55,7 @@ const lf = (s) => String(s || '').replace(/\r\n?/g, '\n');
 
 // ── Config ──
 // Dropbox 앱 키(App key) — 쓰는 사람이 자기 Dropbox 앱을 만들어 넣는다(꾸러미의 CLAUDE.md 3~4단계). 비어 있으면 로그인 단추가 안내만 한다
-const DROPBOX_CLIENT_ID = '';
+const DROPBOX_CLIENT_ID = '0yf7hlh2k16aa2n';
 // PKCE(공개 클라이언트) 방식이므로 app secret은 코드에 두지 않는다 (공개 저장소 노출 방지)
 const DROPBOX_FILE = DBX_ROOT + '/memos.json';
 // 동기화 규칙 버전. 옛 앱이 새 규칙의 데이터를 망가뜨릴 수 있게 바뀔 때만 올린다.
