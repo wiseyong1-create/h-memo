@@ -1,0 +1,1678 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #fff1e5;
+  --bg2: #f6e9d8;
+  --bg3: #e8d6c3;
+  --accent: #990f3d;
+  --accent-fill: #990f3d;   /* 채운 단추 바탕(흰 글자) */
+  --text: #33302e;
+  --text2: #707070;
+  --border: #ccc1b7;
+  --card: #ffffff;
+  --success: #09814a;
+  --hl: #f0f87a;            /* 형광펜·찾기 결과 */
+  --hl-current: #ff9632;    /* 찾기 '지금' 위치 */
+  --sel: #f9e4ea;           /* 고른 줄·충돌본 막대 */
+  --diff-del: #f9e4ea;      /* 비교: 원본에만 */
+  --diff-add: #e2f1e6;      /* 비교: 충돌본에만 */
+  --star-bg: #fff8e1;
+  --flash: #fbe3a6;
+  --menu-bg: #33302e;       /* 휴대폰 햄버거 단추 */
+  --menu-fg: #fff1e5;
+  --radius: 4px;
+  color-scheme: light;
+}
+
+/* 어두운 화면 — html[data-theme="dark"] (화면 설정: 어둡게, 또는 '기기 설정 따름'에서 기기가 어두운 모드일 때) */
+:root[data-theme="dark"] {
+  --bg: #1c1916;
+  --bg2: #302a26;
+  --bg3: #3d3530;
+  --accent: #e5809b;        /* 어두운 바탕 위 글자·선 */
+  --accent-fill: #b02a52;   /* 채운 단추 바탕 */
+  --text: #ece5dd;
+  --text2: #a89f96;
+  --border: #4a423b;
+  --card: #24201d;
+  --success: #5cc48a;
+  --hl: #5d5a1f;
+  --hl-current: #8c4a14;
+  --sel: #452833;
+  --diff-del: #4a2632;
+  --diff-add: #213d2c;
+  --star-bg: #3b311c;
+  --flash: #5a4a1f;
+  --menu-bg: #3d3530;
+  --menu-fg: #ece5dd;
+  color-scheme: dark;       /* 고르기 상자·스크롤 막대 같은 기본 부품도 어둡게 */
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Layout */
+#app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar */
+#sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s;
+}
+
+#sidebar-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sidebar-header h1 {
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  white-space: nowrap;
+}
+
+.btn-backup {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.btn-backup:hover { opacity: 1; }
+.btn-backup:disabled { opacity: 0.3; cursor: default; }
+
+#btn-sync {
+  font-size: 1.2rem;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+#sync-status {
+  font-size: 0.65rem;
+  color: var(--text2);
+  padding: 2px 8px;
+  background: var(--bg);
+  border-radius: 12px;
+}
+#sync-status.synced { color: var(--success); }
+#sync-status.error { color: var(--accent); }
+
+/* 최근 저장·동기화 시각 (햄버거 옆 빈 영역) */
+#save-sync-times {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: var(--text2);
+  white-space: nowrap;
+  text-align: right;                  /* 오른쪽 정렬 → 두 줄의 연월일시분초가 우측에서 정렬됨 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-variant-numeric: tabular-nums; /* 숫자 폭 균일 → 세로로 나란히 */
+}
+
+#search-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+#search-box {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  outline: none;
+}
+#search-box:focus { border-color: var(--accent); }
+#search-box::placeholder { color: var(--text2); }
+
+.btn-search-key {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  color: var(--text2);
+  transition: opacity 0.2s;
+}
+.btn-search-key:hover { opacity: 0.7; }
+/* 검색 필터 — 검색칸 옆 단추를 누르면 아래에 필터 칸(지금은 '제목만').
+   필터가 하나라도 켜져 있으면 단추를 강조색·채운 깔때기로(칸을 닫아도 켜진 줄 알게) */
+#search-filter-wrap { position: relative; flex-shrink: 0; display: flex; }
+#btn-search-filter.on { color: var(--accent); border-color: var(--accent); }
+#btn-search-filter.on .ico { fill: currentColor; }
+#search-filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 4px 0;
+  min-width: 120px;
+}
+.search-filter-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.search-filter-opt:hover { background: var(--bg); }
+.search-filter-opt input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+
+#sidebar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.85; }
+
+.btn-primary {
+  background: var(--accent-fill);
+  color: #fff;
+  flex: 1;
+}
+
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-fav-filter {
+  background: var(--bg);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+.btn-fav-filter.active {
+  background: var(--star-bg);
+  color: #e6a817;
+  border-color: #e6a817;
+}
+
+/* Sort & Select row */
+#sidebar-actions-row2 {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+#memo-sort {
+  flex: 1;
+  padding: 4px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  outline: none;
+  cursor: pointer;
+}
+.btn-select-mode {
+  background: var(--bg);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+.btn-select-mode.active {
+  background: var(--accent-fill);
+  color: #fff;
+  border-color: var(--accent-fill);
+}
+#bulk-actions {
+  display: flex;
+  gap: 4px;
+}
+#bulk-actions .btn {
+  flex: 1;
+  font-size: 0.72rem;
+  padding: 5px 6px;
+}
+.memo-item-checkbox,
+.folder-item-checkbox {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+/* Memo dates */
+#memo-dates {
+  font-size: 0.68rem;
+  color: var(--text2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+}
+#memo-dates-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#btn-help {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+#btn-help:hover { color: var(--text); }
+
+/* 도움말 모달 (.modal-box의 text-align:center를 덮어쓰기 위해 특정도 높임) */
+.modal-box.help-box { text-align: left; max-height: 80vh; overflow-y: auto; }
+.help-box h3 { margin-bottom: 10px; font-size: 1.05rem; text-align: center; }
+.help-content { font-size: 0.82rem; line-height: 1.55; color: var(--text); }
+.help-content .help-h { font-weight: 700; margin: 12px 0 4px; }
+.help-content ul { margin: 0 0 6px 18px; }
+.help-content li { margin: 3px 0; }
+.help-content kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-family: monospace;
+  font-size: 0.78rem;
+}
+.help-box .btn { margin-top: 14px; }
+
+/* Find & Replace */
+#find-replace-bar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.find-row input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  outline: none;
+  background: var(--card);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.find-row input:focus { border-color: var(--accent); }
+#find-count {
+  font-size: 0.7rem;
+  color: var(--text2);
+  min-width: 40px;
+  text-align: center;
+  flex-shrink: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.btn-sm {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.72rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.btn-sm:hover { background: var(--bg2); }
+
+/* Char count — 왼쪽은 동기화 표시, 오른쪽은 글자 수 */
+#char-count {
+  padding: 4px 20px;
+  font-size: 0.7rem;
+  color: var(--text2);
+  text-align: right;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#char-count { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#sync-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text2);
+  font: inherit;
+  cursor: default;
+  white-space: nowrap;
+}
+#sync-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+#sync-dot.ok::before { background: var(--success); }
+#sync-dot.wait::before { background: #c9a227; }
+#sync-dot.busy::before { background: var(--text2); animation: sync-pulse 1s ease-in-out infinite; }
+#sync-dot.bad { color: var(--accent); cursor: pointer; }
+#sync-dot.bad::before { background: var(--accent); }
+@keyframes sync-pulse { 50% { opacity: 0.25; } }
+
+/* 충돌본을 열면 제목 아래에 — 원본과 비교 */
+#conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--sel);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#conflict-bar span { font-weight: 600; }
+#btn-conflict-compare {
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+#btn-conflict-compare:hover { background: var(--bg); }
+
+/* Folder dropdown */
+.folder-dropdown {
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+#folder-list {
+  padding: 4px 0;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text2);
+  transition: background 0.15s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.folder-item:hover { background: var(--bg2); color: var(--text); }
+.folder-item.active { color: var(--accent); font-weight: 600; background: var(--bg); }
+
+.folder-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-item .folder-count {
+  font-size: 0.7rem;
+  color: var(--text2);
+  font-weight: 400;
+}
+
+.folder-item--child {
+  padding-left: 32px;
+}
+.folder-item--grand {
+  padding-left: 50px;
+}
+/* 휴면 폴더 목록 안의 묶음 이름표(휴면 메모) */
+.folder-dormant-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px 3px;
+  font-size: 0.7rem;
+  color: var(--text2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.folder-dormant-group span { overflow: hidden; text-overflow: ellipsis; }
+.folder-dormant-group .ico { width: 1.1em; height: 1.1em; flex-shrink: 0; }
+
+.folder-dormant-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text2);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: background 0.15s;
+}
+.folder-dormant-toggle:hover { background: var(--bg2); color: var(--text); }
+.dormant-arrow { font-size: 0.6rem; color: var(--text2); }
+
+.folder-dormant-list {
+  background: var(--bg);
+}
+
+.folder-collapse-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  margin-left: auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.folder-collapse-btn:hover { opacity: 0.7; }
+
+.folder-add-btn {
+  width: 100%;
+  padding: 7px 14px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-align: left;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.folder-add-btn:hover { background: var(--bg2); color: var(--text); }
+.folder-dropdown-foot { display: flex; border-top: 1px solid var(--border); }
+.folder-dropdown-foot .folder-add-btn { border-top: none; flex: 1; }
+.folder-dropdown-foot #btn-folder-manage { text-align: right; }
+
+/* ── 폴더 관리 화면 (북마크 관리자식) ── */
+#folder-manager {
+  position: fixed;
+  inset: 0;
+  z-index: 90;              /* 사이드바(40)·햄버거(50) 위, 대화상자(100) 아래 */
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.fm-page {
+  background: var(--card);
+  width: min(640px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 48px));
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fm-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+#folder-manager [hidden] { display: none !important; }
+.fm-header h2 { font-family: 'Georgia', 'Times New Roman', serif; font-size: 1.05rem; font-weight: 700; }
+.fm-header #fm-add { flex: 0 0 auto; margin-left: auto; padding: 8px 14px; white-space: nowrap; }
+.fm-icon-btn, .fm-more {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text2);
+  cursor: pointer;
+}
+.fm-icon-btn { color: var(--text); }
+.fm-icon-btn:hover, .fm-more:hover, .fm-row.menu-open .fm-more { background: var(--bg2); color: var(--text); }
+.fm-icon-btn .ico, .fm-more .ico { width: 20px; height: 20px; }
+.fm-info { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 0.95rem; padding: 4px 6px; }
+.fm-info:hover { color: var(--accent); }
+/* 체크한 폴더가 있으면 머리줄 대신 나오는 막대 */
+.fm-selbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 10px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.fm-selbar { flex-wrap: wrap; }
+.fm-sel-n { margin-right: auto; font-size: 0.92rem; font-weight: 600; white-space: nowrap; }
+.fm-sel-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.fm-sel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fm-sel-btn:hover { background: var(--bg2); }
+.fm-sel-btn .ico { width: 16px; height: 16px; }
+.fm-sel-btn.danger { color: var(--accent); border-color: var(--accent); }
+/* 좁은 휴대폰: 단추 셋이 한 줄에 들어가게 아이콘을 빼고 좁힌다 */
+@media (max-width: 420px) {
+  .fm-selbar, .fm-sel-actions { gap: 4px; }
+  .fm-selbar { padding-right: 10px; }
+  .fm-sel-btn { padding: 0 10px; }
+  .fm-sel-btn .ico { display: none; }
+}
+.fm-tip {
+  padding: 10px 16px;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  color: var(--text2);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.fm-tip .ico { width: 1em; height: 1em; vertical-align: -0.12em; }
+.fm-body { flex: 1; overflow-y: auto; position: relative; padding-bottom: 24px; }
+.fm-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 16px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text2);
+}
+.fm-section-head .ico { width: 15px; height: 15px; }
+.fm-section-n { font-weight: 400; }
+.fm-section[data-section="dormant"] { border-top: 1px solid var(--border); margin-top: 10px; }
+.fm-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 10px 0 4px;
+  border-radius: 6px;
+  margin: 0 6px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.fm-row:hover, .fm-row.menu-open { background: var(--bg); }
+.fm-row.selected { background: var(--sel); }
+/* 체크박스는 한 줄로 맞추고, 하위 폴더는 손잡이부터 들여 쓴다 */
+.fm-row.fm-d2 .fm-grip { margin-left: 28px; }
+.fm-row.fm-d3 .fm-grip { margin-left: 56px; }
+.fm-check {
+  width: 32px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.fm-check input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.fm-grip {
+  width: 26px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--border);
+  cursor: grab;
+  touch-action: none;       /* 손가락으로 끌 때 화면이 굴러가지 않게 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.fm-row:hover .fm-grip { color: var(--text2); }
+.fm-grip .ico { width: 18px; height: 18px; }
+.fm-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.fm-name > .ico { width: 18px; height: 18px; color: var(--text2); }
+.fm-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-lock { display: inline-flex; color: var(--text2); }
+.fm-lock .ico { width: 14px; height: 14px; }
+.fm-count { min-width: 26px; text-align: right; font-size: 0.75rem; color: var(--text2); flex-shrink: 0; margin-right: 6px; }
+.fm-input {
+  -webkit-user-select: text;
+  user-select: text;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+/* 휴면 묶음: 휴면 메모가 같은 폴더끼리 */
+.fm-group + .fm-group { margin-top: 6px; }
+.fm-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  margin: 2px 6px 0;
+  padding: 0 10px 0 12px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.fm-group-head > .ico { width: 15px; height: 15px; color: var(--text2); }
+.fm-group-note { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-group-note.empty { font-weight: 400; color: var(--text2); }
+.fm-group-meta { flex-shrink: 0; font-size: 0.72rem; color: var(--text2); white-space: nowrap; }
+.fm-group-head .fm-more { width: 30px; height: 30px; }
+.fm-group-head.menu-open { background: var(--bg2); }
+.fm-empty {
+  margin: 4px 16px 6px;
+  padding: 14px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text2);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+.fm-menu {
+  position: fixed;
+  z-index: 95;
+  min-width: 200px;
+  padding: 6px 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.16);
+}
+.fm-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+.fm-menu button:hover { background: var(--bg); }
+.fm-menu button .ico { width: 18px; height: 18px; color: var(--text2); }
+.fm-menu button.danger { color: var(--accent); border-top: 1px solid var(--bg2); margin-top: 4px; }
+.fm-menu button.danger .ico { color: var(--accent); }
+/* 끌기 */
+.fm-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 96;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.fm-ghost .ico { width: 16px; height: 16px; color: var(--text2); }
+.fm-row.fm-dragging { opacity: 0.35; }
+.fm-drop-line {
+  display: none;
+  position: absolute;
+  right: 16px;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.fm-drop-line::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.fm-row.fm-drop-into { background: var(--bg2); box-shadow: inset 0 0 0 2px var(--accent); }
+.fm-empty.fm-drop-here { border-color: var(--accent); color: var(--accent); background: var(--bg); }
+body.fm-drag-on, body.fm-drag-on * { cursor: grabbing !important; user-select: none; }
+.fm-row.fm-flash { animation: fm-flash 1.6s ease-out; }
+@keyframes fm-flash { 0%, 35% { background: var(--flash); } 100% { background: transparent; } }
+
+@media (max-width: 768px) {
+  #folder-manager { background: var(--card); align-items: stretch; }
+  .fm-page { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+}
+@media (pointer: coarse) {
+  .fm-row { min-height: 52px; }
+  .fm-check { width: 40px; height: 44px; }
+  .fm-check input { width: 20px; height: 20px; }
+  .fm-name { font-size: 0.98rem; }
+  .fm-grip { width: 34px; height: 44px; color: var(--text2); }
+}
+
+/* Memo list */
+/* 폴더 영역 + 노트 영역을 하나의 스크롤로 통합 */
+#sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#memo-list {
+  padding: 4px 8px;
+}
+
+/* Sidebar footer */
+#sidebar-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#sidebar-footer button {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#sidebar-footer button:hover { color: var(--accent); }
+
+.memo-item {
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.memo-item:hover { background: var(--bg2); }
+.memo-item.active { background: var(--bg2); border-left: 3px solid var(--accent); }
+
+.memo-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.memo-item-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memo-item-date {
+  font-size: 0.65rem;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+
+.memo-item-fav {
+  font-size: 0.7rem;
+  color: #e6a817;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+/* 검색: 찾은 자리 한 줄 · 휴면 폴더에서 찾은 글 */
+.memo-item-snippet {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.memo-item-snippet b { color: var(--text); font-weight: 700; background: var(--hl); }
+.memo-list-divider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 2px 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text2);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.memo-list-divider .ico { width: 1.1em; height: 1.1em; }
+.memo-item.dormant-hit .memo-item-title { color: var(--text2); }
+.memo-list-empty { padding: 16px 10px; font-size: 0.8rem; color: var(--text2); text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+/* Folder select in editor toolbar */
+#memo-folder-select {
+  padding: 6px 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  outline: none;
+  cursor: pointer;
+  max-width: 140px;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#memo-folder-select:focus { border-color: var(--accent); }
+
+/* Folder Select */
+#folder-select-wrap {
+  position: relative;
+}
+
+#folder-select-dropdown {
+  position: fixed; /* overflow:hidden 컨테이너(#editor-toolbar) 탈출 위해 fixed */
+  z-index: 100;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+#folder-select-list {
+  padding: 4px 0;
+}
+
+.folder-select-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s;
+}
+.folder-select-item:hover { background: var(--bg); }
+.folder-select-item.active { background: var(--bg2); color: var(--accent); font-weight: 600; }
+.folder-select-item--child { padding-left: 28px; }
+.folder-select-item--grand { padding-left: 44px; }
+
+/* Template */
+#template-wrap {
+  position: relative;
+}
+
+#template-dropdown {
+  position: fixed; /* overflow:hidden 컨테이너 탈출 */
+  z-index: 100;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+#template-list {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.template-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--bg2);
+  font-size: 0.85rem;
+}
+
+.template-item:hover {
+  background: var(--bg);
+}
+
+.template-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-item-del {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-left: 8px;
+  line-height: 1;
+}
+
+.template-item-del:hover {
+  color: var(--accent);
+}
+
+.template-action-btn {
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.template-action-btn:hover {
+  background: var(--bg);
+}
+
+/* Editor area */
+#editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#editor-toolbar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow: hidden;
+  transition: max-height 0.25s ease, padding 0.25s ease, opacity 0.2s ease, border-bottom-width 0.25s ease;
+}
+/* 본문 스크롤 다운 시 툴바·제목 접기 */
+body.toolbar-hidden #editor-toolbar {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-bottom-width: 0;
+  gap: 0;
+}
+
+/* 메뉴 펼치기 버튼: 툴바가 숨겨졌을 때만 표시 */
+#toolbar-reveal {
+  display: none;
+  width: 100%;
+  height: 26px;
+  background: var(--card);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+  color: var(--text2);
+  font-size: 0.7rem;
+  cursor: pointer;
+  line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#toolbar-reveal:hover { background: var(--bg); color: var(--text); }
+body.toolbar-hidden #toolbar-reveal { display: flex; align-items: center; justify-content: center; }
+
+#toolbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#btn-toolbar-more {
+  display: flex;
+  flex-shrink: 0;
+  margin-left: auto; /* 더보기 버튼만 우측 끝으로 밀착 */
+}
+
+/* 더보기로 펼치는 추가 버튼: 기본 숨김, 펼치면 표시 (PC·모바일 공통) */
+/* #toolbar-buttons로 특정도를 높여 .btn-icon의 display:flex를 확실히 덮어쓴다 */
+#toolbar-buttons .toolbar-extra { display: none; }
+#toolbar-buttons .toolbar-extra.toolbar-show { display: flex; }
+
+#memo-title-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: var(--title-font, 1.1rem);
+  font-weight: 600;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  outline: none;
+}
+#memo-title-input:focus { border-color: var(--accent); }
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.btn-icon:hover { background: var(--bg2); }
+/* 선 아이콘 공통 (index.html 맨 위 아이콘 모음). 선 굵기는 모두 1.4 로 통일 */
+.ico { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; vertical-align: -0.25em; flex-shrink: 0; }
+.btn-icon .ico, #menu-toggle .ico { width: 20px; height: 20px; }
+.btn-backup .ico { width: 17px; height: 17px; display: block; }
+.btn-search-key .ico { width: 15px; height: 15px; display: block; }
+.btn-fav-filter .ico, .btn-select-mode .ico { width: 16px; height: 16px; display: block; }
+.folder-item-name .ico { width: 1em; height: 1em; vertical-align: -0.12em; }
+/* 즐겨찾기 켜짐(★): 별 속을 채운다 */
+.btn-icon.fav-active .ico, .btn-fav-filter.active .ico { fill: currentColor; }
+.btn-icon.active { background: var(--accent-fill); color: #fff; border-color: var(--accent-fill); }
+.btn-icon.fav-active { color: #e6a817; background: var(--bg); border-color: var(--border); }
+
+#editor-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  background: var(--card);
+}
+
+#editor-highlight {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  padding: 20px;
+  font-family: 'Gulim', '굴림', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: var(--editor-font, 14px) !important;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: transparent;
+  pointer-events: none;
+  overflow-y: auto;
+  background: var(--card);
+  z-index: 0;
+}
+
+/* 형광펜(user)·찾기결과(search)는 옅은 형광 노랑, 찾기 '현재' 위치(search-current)만 주황색 */
+#editor-highlight mark.user,
+#editor-highlight mark.search,
+#editor-highlight mark.search-current {
+  background: var(--hl);
+  color: transparent;
+  border-radius: 2px;
+}
+
+#editor-highlight mark.search-current {
+  background: var(--hl-current);
+}
+
+/* 굵게: 위의 입력칸 글자는 그대로 두고, 바로 뒤 겹침층에 같은 글자를 옆으로 살짝 밀어 한 번 더 찍어 획을 두껍게 한다.
+   진짜 굵은 글꼴(font-weight)은 글자 폭이 달라져 커서·선택 자리가 글자와 어긋난다 — 폭은 그대로, 획만 두껍게 */
+#editor-highlight b {
+  font-weight: inherit;
+  color: var(--text);
+  text-shadow: 0.7px 0 0 var(--text);
+}
+
+#editor {
+  flex: 1;
+  padding: 20px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: 'Gulim', '굴림', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: var(--editor-font, 14px) !important;
+  line-height: 1.7;
+  resize: none;
+  outline: none;
+  overflow-y: auto;
+  word-break: break-word;
+  position: relative;
+  z-index: 1;
+}
+
+#editor.viewer {
+  background: transparent; /* 뒤 오버레이의 형광펜이 읽기 모드에서도 보이도록 투명 유지 */
+  cursor: default;
+  user-select: text;
+}
+
+/* Popup mode (새 창으로 메모 열기) */
+.popup-mode #sidebar,
+.popup-mode #menu-toggle,
+.popup-mode #login-screen { display: none !important; }
+.popup-mode #app { display: flex !important; }
+.popup-mode #toolbar-buttons { padding-left: 0 !important; flex-wrap: wrap; }
+/* 확장 시 overflow 제거 + toolbar-right를 투명 컨테이너로 해제하여 자연스러운 줄 바꿈 */
+.popup-mode #toolbar-buttons.expanded { overflow-x: visible; }
+.popup-mode #toolbar-buttons.expanded #toolbar-right { display: contents; }
+
+/* Empty state */
+#empty-state {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text2);
+  font-size: 1.1rem;
+  gap: 12px;
+  overflow: hidden;   /* 첫 화면 자체는 굴러가지 않는다 — 글이 많으면 최근 글 상자 안에서만 굴러간다 */
+}
+/* 이 부분을 누르면 새 글 */
+.empty-hero { display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer; flex-shrink: 0; }
+#empty-state .icon { font-size: 3rem; opacity: 0.3; }
+/* 빈 화면 아래 최근 글 — 휴대폰에서만(넓은 화면은 왼쪽 목록이 늘 보인다) */
+#recent-list { display: none; }
+@media (max-width: 768px) {
+  #empty-state:has(#recent-list:not(:empty)) { justify-content: flex-start; padding: 72px 16px 24px; }
+  #recent-list:not(:empty) {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;   /* 글이 적으면 그 길이만큼, 많으면 화면 아래 끝까지 — 나머지는 상자 안에서 굴러간다 */
+    min-height: 0;
+    width: 100%;
+    max-width: 480px;
+    margin-top: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+}
+.recent-head { flex-shrink: 0; padding: 7px 12px 4px; border-bottom: 1px solid var(--bg2); font-size: 0.72rem; font-weight: 600; color: var(--text2); }
+/* 글 줄만 굴러가고 '최근 글'·'모든 글 보기'는 상자 위아래에 붙어 있다. 끝까지 굴려도 화면 전체로 번지지 않게(contain) */
+.recent-scroll {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.recent-item {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--bg2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.recent-item:first-child { border-top: none; }   /* 제목 아래 선은 '최근 글' 쪽에 — 굴려도 남는다 */
+.recent-item:hover { background: var(--bg); }
+.recent-title { flex: 1; min-width: 0; font-size: 0.86rem; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-date { flex-shrink: 0; font-size: 0.7rem; color: var(--text2); }
+.recent-all {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* Login screen */
+#login-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 20px;
+  background: var(--bg);
+}
+#login-screen h1 { font-size: 2rem; color: var(--text); }
+#login-screen p { color: var(--text2); max-width: 400px; text-align: center; }
+.btn-dropbox {
+  background: #0061ff;
+  color: #fff;
+  padding: 12px 28px;
+  font-size: 1rem;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.btn-dropbox:hover { background: #004fd6; }
+
+/* Modal (delete confirm, folder input) */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal-box {
+  background: var(--card);
+  padding: 24px;
+  border-radius: var(--radius);
+  text-align: center;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.modal-box p { margin-bottom: 16px; }
+.modal-box .btn { margin: 0 6px; }
+.modal-box input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  margin-bottom: 16px;
+}
+.modal-box input[type="text"]:focus { border-color: var(--accent); }
+.modal-box input[type="password"] {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  margin-bottom: 8px;
+}
+.modal-box input[type="password"]:focus { border-color: var(--accent); }
+.modal-box input.error { border-color: var(--accent); }
+.modal-box input.error::placeholder { color: var(--accent); }
+
+/* 확인 창의 덧말 · 도움말의 판 번호 · 로그인 화면의 까닭 */
+.ask-note { font-size: 0.8rem; color: var(--text2); }
+.help-ver { margin-top: 12px; font-size: 0.72rem; color: var(--text2); text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.login-reason { color: var(--accent) !important; font-size: 0.9rem; }
+
+/* 휴지통 */
+.modal-box.trash-box {
+  max-width: 520px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 14px 16px 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.trash-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.trash-head h3 { display: flex; align-items: center; gap: 6px; font-size: 1rem; font-family: 'Georgia', 'Times New Roman', serif; }
+.trash-head h3 .ico { width: 18px; height: 18px; color: var(--text2); }
+.trash-n { font-size: 0.8rem; font-weight: 400; color: var(--text2); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.modal-box input.trash-filter {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.85rem;
+  outline: none;
+}
+.modal-box input.trash-filter:focus { border-color: var(--accent); }
+.modal-box input.trash-filter[hidden] { display: none; }
+.trash-list { overflow-y: auto; flex: 1; min-height: 0; border-top: 1px solid var(--border); }
+.trash-item { border-bottom: 1px solid var(--border); }
+.trash-row { display: flex; align-items: center; gap: 6px; padding: 8px 2px; }
+.trash-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.trash-main[data-tact] { cursor: pointer; }
+.trash-main > .ico { width: 18px; height: 18px; color: var(--text2); }
+.trash-text { min-width: 0; flex: 1; }
+.trash-name { font-size: 0.88rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trash-meta { margin-top: 1px; font-size: 0.7rem; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modal-box .trash-btn { flex: 0 0 auto; margin: 0; padding: 4px 9px; font-size: 0.75rem; }
+.trash-del { background: none; border: 1px solid var(--border); border-radius: var(--radius); color: var(--accent); cursor: pointer; font-weight: 600; }
+.trash-del:hover { border-color: var(--accent); }
+.trash-preview {
+  margin: 0 2px 8px 28px;
+  padding: 6px 10px;
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+  color: var(--text2);
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+.trash-preview[hidden] { display: none; }
+.trash-empty { padding: 18px 0; font-size: 0.88rem; color: var(--text2); text-align: center; }
+.trash-foot { display: flex; justify-content: space-between; padding-top: 10px; }
+.trash-foot[hidden] { display: none; }
+.trash-link { background: none; border: none; padding: 4px 2px; color: var(--text2); font: inherit; font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
+.trash-link:hover { color: var(--text); }
+.trash-link.danger { color: var(--accent); }
+
+/* 충돌본 ↔ 원본 비교 */
+.modal-box.cmp-box {
+  max-width: 640px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 14px 16px 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.modal-box .cmp-legend { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 0.75rem; color: var(--text2); }
+.cmp-key { padding: 1px 8px; border-radius: 10px; }
+.modal-box .cmp-title { font-size: 0.78rem; color: var(--text2); margin-bottom: 8px; }
+.cmp-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: 'Gulim', '굴림', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.cmp-line { padding: 1px 10px; white-space: pre-wrap; word-break: break-word; }
+.cmp-del { background: var(--diff-del); }
+.cmp-line.cmp-del { box-shadow: inset 3px 0 0 var(--accent); }
+.cmp-add { background: var(--diff-add); }
+.cmp-line.cmp-add { box-shadow: inset 3px 0 0 var(--success); }
+.cmp-fold { padding: 2px 10px; font-size: 0.72rem; color: var(--text2); background: var(--bg); text-align: center; }
+.cmp-foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 10px; }
+.modal-box .cmp-foot .btn { flex: 0 0 auto; margin: 0; }
+
+/* 화면 설정 — 어두운 화면 · 글자 크기 */
+.modal-box.disp-box {
+  max-width: 400px;
+  text-align: left;
+  padding: 14px 18px 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.disp-box .trash-head h3 { font-family: 'Georgia', 'Times New Roman', serif; }
+.disp-label { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 8px; font-size: 0.8rem; font-weight: 600; color: var(--text2); }
+.disp-px { font-weight: 400; }
+.disp-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.disp-seg button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.disp-seg button .ico { width: 20px; height: 20px; }
+.disp-seg button.on { background: var(--card); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); font-weight: 600; }
+.disp-font { display: flex; align-items: center; gap: 10px; }
+.disp-font input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.disp-step {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Gulim', '굴림', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+}
+.disp-step.big { font-size: 20px; }
+.disp-preview {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+  font-family: 'Gulim', '굴림', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.7;
+  max-height: 160px;
+  overflow: hidden;
+}
+.disp-foot { display: flex; justify-content: flex-start; margin-top: 10px; }
+
+/* legacy compat */
+.delete-confirm { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.delete-confirm-box { background: var(--card); padding: 24px; border-radius: var(--radius); text-align: center; max-width: 360px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+.delete-confirm-box p { margin-bottom: 16px; }
+.delete-confirm-box .btn { margin: 0 6px; }
+
+/* Toast */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--text);
+  color: var(--card);
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+  z-index: 200;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.show.has-action { pointer-events: auto; }
+.toast-action { margin-left: 14px; padding: 0; background: none; border: none; color: var(--bg); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; white-space: nowrap; }
+
+/* Mobile */
+#menu-toggle {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  width: 36px;
+  height: 36px;
+  background: var(--menu-bg);
+  border: none;
+  border-radius: var(--radius);
+  color: var(--menu-fg);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: width 0.2s, height 0.2s, top 0.2s, left 0.2s, border-radius 0.2s, font-size 0.2s;
+}
+
+/* 더보기 버튼은 PC·모바일 공통 표시 — display는 위 #btn-toolbar-more 기본 규칙 참조 */
+
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    z-index: 40;
+    transform: translateX(-100%);
+  }
+  #sidebar.open { transform: translateX(0); }
+  #menu-toggle { display: flex; align-items: center; justify-content: center; }
+  #sidebar-header { padding-top: 56px; position: relative; }
+  /* 햄버거(좌상단) 오른쪽 빈 자리에 배치 */
+  #save-sync-times { position: absolute; top: 8px; left: 56px; right: 12px; font-size: 0.6rem; }
+  #editor-toolbar { padding: 8px 10px; gap: 6px; }
+  #toolbar-buttons { gap: 4px; flex-wrap: nowrap; padding-left: 46px; padding-right: 46px; align-items: center; position: relative; }
+  #toolbar-right { gap: 4px; }
+  #menu-toggle { width: 38px; height: 38px; font-size: 1.1rem; top: 8px; left: 10px; }
+
+  /* 툴바 숨김 시: 햄버거를 ▼ 줄 왼쪽 끝에 같은 높이로 작게 배치 (본문 겹침 방지) */
+  body.toolbar-hidden #menu-toggle {
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 26px;
+    font-size: 1rem;
+    border-radius: 0;
+    z-index: 51;
+  }
+
+  /* 모바일: 추가 버튼 숨기고, 더보기 표시 */
+  .toolbar-extra { display: none !important; }
+  .toolbar-extra.toolbar-show { display: flex !important; }
+  select.toolbar-extra.toolbar-show { display: inline-block !important; }
+  /* 더보기 버튼은 우상단에 고정 → 펼침 전/후 위치 동일, 다른 버튼이 그 자리를 침범 못함 */
+  #btn-toolbar-more { display: flex; position: absolute; top: 0; right: 0; }
+  /* 더보기 펼침: 햄버거 자리(46px) 유지 + 줄 바꿈 + toolbar-right 박스 해제 */
+  #toolbar-buttons.expanded { padding-left: 46px; flex-wrap: wrap; }
+  #toolbar-buttons.expanded #toolbar-right { display: contents; }
+  #memo-title-input { margin: 0; }
+  #editor-container { flex-direction: column; }
+
+  /* 모바일 에디터 툴바 */
+  #memo-folder-select { max-width: 100px; font-size: 0.75rem; }
+  .btn-icon { width: 38px; height: 38px; font-size: 1.1rem; }
+}
+
+/* 모바일·팝업 전체에서 폴더 선택·템플릿 버튼 항상 표시 (아이콘 버튼이라 자리 차지 작음) */
+@media (max-width: 768px) {
+  #folder-select-wrap { display: flex !important; }
+  #template-wrap { display: flex !important; }
+}
+
+/* 터치 기기(실제 모바일)에서만 글자 크기 증가 */
+@media (max-width: 768px) and (pointer: coarse) {
+  .memo-item-title { font-size: 0.92rem; }
+  .memo-item-date { font-size: 0.75rem; }
+  #memo-title-input { font-size: var(--title-font, 19px); padding: 8px 10px; }
+  #editor, #editor-highlight { font-size: var(--editor-font, 17px) !important; }
+  #search-box { font-size: 0.92rem; }
+  .search-filter-opt { font-size: 0.92rem; padding: 11px 14px; }
+  .search-filter-opt input { width: 18px; height: 18px; }
+  .btn { font-size: 0.9rem; }
+  .folder-item { font-size: 0.92rem; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bg3); }
