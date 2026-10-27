@@ -40,7 +40,7 @@ const store = {
 const MODE_QUERY = TEST_NS ? '&ns=' + encodeURIComponent(TEST_NS) + (SPLIT_SYNC ? '&split=1' : '') : '';
 
 // 이 화면의 판 번호 — 도움말 맨 아래에 보인다(휴대폰이 옛 코드로 도는지 확인용). sw.js 의 CACHE_NAME 과 함께 올린다
-const APP_VERSION = '173';
+const APP_VERSION = '174';
 
 let storageFullAt = 0;
 function onStorageFull(e) {
@@ -5186,6 +5186,10 @@ function renderFolderList() {
   folderList.innerHTML = html;
   updateFolderToggleLabel();
 
+  // 선택 모드의 '목록 접기' — '전체' 줄을 누르면 전체 글을 보이므로, 접기는 이 글자로만
+  const collapseBtnEl = folderList.querySelector('.folder-collapse-btn');
+  if (collapseBtnEl) collapseBtnEl.addEventListener('click', (e) => { e.stopPropagation(); toggleFolderListCollapse(); });
+
   // 휴면 폴더 토글
   const dormantToggle = folderList.querySelector('#dormant-toggle');
   if (dormantToggle) {
@@ -5220,10 +5224,12 @@ function renderFolderList() {
     selectableFolderItems.forEach((el, idx) => {
       el.addEventListener('touchstart', (e) => {
         touchSelectActive = false;
+        el._fLongPressed = false;
         fTouchStartIdx = idx;
         fTouchLastIdx = idx;
         el._fLongPress = setTimeout(() => {
           touchSelectActive = true;
+          el._fLongPressed = true;
           const cb = el.querySelector('.folder-item-checkbox');
           if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
           lastCheckedFolderIndex = idx;
@@ -5290,47 +5296,43 @@ function renderFolderList() {
     el.addEventListener('click', (e) => {
       if (didLongPress) { didLongPress = false; return; }
 
-      // 선택 모드: 폴더 체크박스 토글 + Shift 범위 선택
+      // 선택 모드: 폴더 이름을 누르면 아래에서 그 폴더 글을 보이고, 네모칸 쪽을 누르면 그 폴더를 고른다(Shift 는 범위 선택).
+      // 예전엔 선택 모드에서 폴더를 눌러도 고르기만 되고 미분류는 아무 일이 없어, 다른 폴더 글을 볼 수 없었다
       if (selectMode) {
-        if (el.dataset.folder === '__all__') { toggleFolderListCollapse(); return; }
+        if (el._fLongPressed) { el._fLongPressed = false; return; }   // 길게 눌러 고른 뒤 따라오는 클릭
         const cb = el.querySelector('.folder-item-checkbox');
-        if (!cb) return; // 미분류는 체크박스 없음
-        const idx = selectableFolderItems.indexOf(el);
-        if (e.shiftKey && lastCheckedFolderIndex >= 0 && idx >= 0) {
-          const start = Math.min(lastCheckedFolderIndex, idx);
-          const end = Math.max(lastCheckedFolderIndex, idx);
-          for (let i = start; i <= end; i++) {
-            const c = selectableFolderItems[i].querySelector('.folder-item-checkbox');
-            if (c && !c.checked) { c.checked = true; c.dispatchEvent(new Event('change')); }
+        if (cb && (e.shiftKey || !e.target.closest('.folder-item-name'))) {
+          const idx = selectableFolderItems.indexOf(el);
+          if (e.shiftKey && lastCheckedFolderIndex >= 0 && idx >= 0) {
+            const start = Math.min(lastCheckedFolderIndex, idx);
+            const end = Math.max(lastCheckedFolderIndex, idx);
+            for (let i = start; i <= end; i++) {
+              const c = selectableFolderItems[i].querySelector('.folder-item-checkbox');
+              if (c && !c.checked) { c.checked = true; c.dispatchEvent(new Event('change')); }
+            }
+            lastCheckedFolderIndex = idx;
+            return;
           }
-          lastCheckedFolderIndex = idx;
+          if (e.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+          if (idx >= 0) lastCheckedFolderIndex = idx;
           return;
         }
-        if (e.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
-        if (idx >= 0) lastCheckedFolderIndex = idx;
-        return;
       }
 
       const val = el.dataset.folder;
-      folderPicked = true;
-      if (val === '__all__') { currentFolder = null; }
-      else if (val === '__none__') { currentFolder = '__none__'; }
-      else {
-        if (isFolderLocked(val)) {
-          showPasswordPrompt(val, () => {
-            currentFolder = val;
-            folderPicked = true;
-            saveUiPrefs();
-            renderAll();
-            if (!selectMode) $('#folder-dropdown').style.display = 'none';
-          });
-          return;
-        }
-        currentFolder = val;
-      }
-      saveUiPrefs();
-      renderAll();
-      if (!selectMode) $('#folder-dropdown').style.display = 'none';
+      const go = (id) => {
+        // 선택 모드에서 다른 폴더로 가면 고른 글을 비운다 — 안 보이는 글이 골라진 채 이동·삭제되지 않게
+        if (selectMode && id !== currentFolder) { selectedMemos.clear(); lastCheckedMemoIndex = -1; }
+        currentFolder = id;
+        folderPicked = true;
+        saveUiPrefs();
+        renderAll();
+        if (!selectMode) $('#folder-dropdown').style.display = 'none';
+      };
+      if (val === '__all__') go(null);
+      else if (val === '__none__') go('__none__');
+      else if (isFolderLocked(val)) showPasswordPrompt(val, () => go(val));
+      else go(val);
     });
   });
 }
@@ -5471,12 +5473,22 @@ function renderMemoList() {
     }
     return html;
   };
+  // 목록이 비면 까닭을 적는다 — 즐겨찾기만 보는 줄 모르면 글이 사라진 것처럼 보인다
+  const emptyHtml = () => {
+    if (query) return '<div class="memo-list-empty">찾는 글이 없습니다</div>';
+    if (favFilterActive) return '<div class="memo-list-empty">즐겨찾기한 글만 보는 중입니다' +
+      '<button type="button" class="memo-list-empty-btn" id="btn-show-all-memos">모든 글 보기</button></div>';
+    if (currentFolder === '__none__') return '<div class="memo-list-empty">미분류 글이 없습니다</div>';
+    if (currentFolder) return '<div class="memo-list-empty">이 폴더에 글이 없습니다</div>';
+    return '';
+  };
   const asTree = folderTreeView && !query && currentFolder !== '__none__' && folders.length > 0;
   memoList.classList.toggle('tree-view', asTree);
-  memoList.innerHTML = asTree ? treeHtml() : filtered.map((m) => itemHtml(m)).join('') +
+  memoList.innerHTML = (asTree ? treeHtml() : filtered.map((m) => itemHtml(m)).join('') +
     (dormantHits.length ? `<div class="memo-list-divider">${ico('moon')}<span>휴면 폴더에서 찾은 글 ${dormantHits.length}</span></div>` +
-      dormantHits.map((m) => itemHtml(m, ' dormant-hit')).join('') : '') +
-    (query && !filtered.length && !dormantHits.length ? '<div class="memo-list-empty">찾는 글이 없습니다</div>' : '');
+      dormantHits.map((m) => itemHtml(m, ' dormant-hit')).join('') : '')) || emptyHtml();
+  const showAllBtn = memoList.querySelector('#btn-show-all-memos');
+  if (showAllBtn) showAllBtn.addEventListener('click', toggleFavFilter);
 
   // 폴더별 보기: 폴더 줄을 누르면 접고 펼친다(잠긴 폴더는 비밀번호부터). 접어 둔 것은 이 기기에 기억
   memoList.querySelectorAll('.tree-folder').forEach((el) => {

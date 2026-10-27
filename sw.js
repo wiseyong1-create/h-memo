@@ -1,4 +1,4 @@
-const CACHE_NAME = 'memo-v173';
+const CACHE_NAME = 'memo-v174';
 // 경로는 이 파일(sw.js) 자리 기준 — 주소 아래 폴더(아이디.github.io/저장소/)에 두든 주소 맨 앞(/)에 두든 같이 쓴다
 const ASSETS = [
   './',
