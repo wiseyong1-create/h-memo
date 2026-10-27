@@ -40,7 +40,7 @@ const store = {
 const MODE_QUERY = TEST_NS ? '&ns=' + encodeURIComponent(TEST_NS) + (SPLIT_SYNC ? '&split=1' : '') : '';
 
 // 이 화면의 판 번호 — 도움말 맨 아래에 보인다(휴대폰이 옛 코드로 도는지 확인용). sw.js 의 CACHE_NAME 과 함께 올린다
-const APP_VERSION = '172';
+const APP_VERSION = '173';
 
 let storageFullAt = 0;
 function onStorageFull(e) {
@@ -98,6 +98,8 @@ let lastCheckedMemoIndex = -1;
 let lastCheckedFolderIndex = -1;
 let touchSelectActive = false; // 모바일 롱프레스 범위 선택 활성 여부
 let memoSortKey = 'updatedAt';
+let folderTreeView = false;   // 폴더별 보기 — 켜면 목록이 폴더 나무(폴더 아래 그 글), 끄면 날짜순 한 줄
+let treeClosed = new Set();   // 폴더별 보기에서 접어 둔 폴더 id('__none__' = 미분류). 처음엔 모두 펼침
 let saveTimer = null;
 // 못 보낸 변경이 있는지(pending_sync), Dropbox 파일 버전(rev), 지난 동기화 때의 각 글 시각(sync_base)
 let lastPullAt = 0;
@@ -373,6 +375,7 @@ async function init() {
   $('#btn-help').addEventListener('click', showHelpDialog);
   $('#btn-delete').addEventListener('click', confirmDelete);
   $('#memo-sort').addEventListener('change', (e) => { memoSortKey = e.target.value; saveUiPrefs(); renderMemoList(); });
+  $('#btn-tree-view').addEventListener('click', toggleTreeView);
   // 검색 필터 — 검색칸 옆 단추로 필터 칸을 열고 닫는다(바깥을 누르거나 Esc 로도 닫힘). 필터를 바꿔도 칸은 열어 둔다
   $('#btn-search-filter').addEventListener('click', () => {
     const p = $('#search-filter-panel');
@@ -702,10 +705,11 @@ function updateSearchFilterButton() {
   b.title = searchTitleOnly ? '검색 필터 — 제목만' : '검색 필터';
 }
 
-// ── 화면 설정 기억 (정렬·보던 폴더·즐겨찾기 필터·검색 '제목만') ──
+// ── 화면 설정 기억 (정렬·보던 폴더·즐겨찾기 필터·검색 '제목만'·폴더별 보기와 접어 둔 폴더) ──
 function saveUiPrefs() {
   if (document.body.classList.contains('popup-mode')) return;
-  store.setItem('ui_prefs', JSON.stringify({ sort: memoSortKey, folder: currentFolder, fav: favFilterActive, titleOnly: searchTitleOnly }));
+  store.setItem('ui_prefs', JSON.stringify({ sort: memoSortKey, folder: currentFolder, fav: favFilterActive, titleOnly: searchTitleOnly,
+    tree: folderTreeView, treeClosed: [...treeClosed] }));
 }
 function restoreUiPrefs() {
   let p = null;
@@ -717,6 +721,9 @@ function restoreUiPrefs() {
   searchTitleOnly = !!p.titleOnly;
   $('#search-title-only').checked = searchTitleOnly;
   updateSearchFilterButton();
+  folderTreeView = !!p.tree;
+  $('#btn-tree-view').classList.toggle('active', folderTreeView);
+  if (Array.isArray(p.treeClosed)) treeClosed = new Set(p.treeClosed.filter((x) => typeof x === 'string'));
   // 폴더가 없어졌거나 잠겨 있으면 '전체'로 (열 때마다 비밀번호를 묻지 않게)
   if (p.folder === '__none__') currentFolder = '__none__';
   else if (p.folder && folders.some((f) => f.id === p.folder) && !isFolderLocked(p.folder)) currentFolder = p.folder;
@@ -5099,6 +5106,13 @@ function toggleFavFilter() {
   renderMemoList();
 }
 
+function toggleTreeView() {
+  folderTreeView = !folderTreeView;
+  saveUiPrefs();
+  $('#btn-tree-view').classList.toggle('active', folderTreeView);
+  renderMemoList();
+}
+
 function updateFolderToggleLabel() {
   const btn = $('#btn-folder-toggle');
   let label = '전체';
@@ -5374,7 +5388,7 @@ function renderMemoList() {
     filtered = [...favs, ...normals];
   }
 
-  const itemHtml = (m, extraCls = '') => {
+  const itemHtml = (m, extraCls = '', depth = null) => {
     const title = m.title || formatCreatedAt(m.createdAt) + ' 새 글';
     const date = formatDate(m.updatedAt);
     const active = m.id === currentId ? 'active' : '';
@@ -5387,7 +5401,7 @@ function renderMemoList() {
     // 검색어가 본문에 있으면 찾은 자리 둘레를 한 줄로('제목만'으로 찾을 땐 본문을 보이지 않는다)
     const snip = query && !searchTitleOnly ? searchSnippet(m, query) : '';
     return `
-        <div class="memo-item ${active}${extraCls}" data-id="${m.id}">
+        <div class="memo-item ${active}${extraCls}" data-id="${m.id}"${depth !== null ? ` style="--d:${depth}"` : ''}>
           ${checkbox}
           ${favIcon}
           <div class="memo-item-info">
@@ -5398,10 +5412,93 @@ function renderMemoList() {
         </div>
       `;
   };
-  memoList.innerHTML = filtered.map((m) => itemHtml(m)).join('') +
+  // 폴더별 보기: 폴더 줄(▸/▾) 아래에 그 폴더의 글, 그 아래 하위 폴더(3단계까지).
+  // 찾을 때·미분류만 볼 때·폴더가 하나도 없을 때는 한 줄 목록 그대로
+  const treeHtml = () => {
+    const known = new Set(folders.map((f) => f.id));
+    const byFolder = new Map();
+    for (const m of filtered) {
+      const k = m.folder && known.has(m.folder) ? m.folder : '__none__';   // 폴더가 사라진 글은 미분류로
+      if (!byFolder.has(k)) byFolder.set(k, []);
+      byFolder.get(k).push(m);
+    }
+    // 폴더 안에선 즐겨찾기가 위(최근 지정순), 나머지는 정렬 칸 순서
+    const ordered = (list) => [...list.filter((m) => m.favorite).sort((a, b) => (b.favoritedAt || 0) - (a.favoritedAt || 0)),
+      ...list.filter((m) => !m.favorite)];
+    const items = (list, depth) => ordered(list).map((m) => itemHtml(m, ' in-tree', depth)).join('');
+    const dormantIds = getDormantFolderIds();
+    const kids = (id) => getChildFolders(id).filter((c) => !dormantIds.has(c.id));
+    // 아래 폴더까지 합친 글 수(지금 목록에 보이는 글만)
+    const countOf = (id, seen = new Set()) => {
+      if (seen.has(id)) return 0;
+      seen.add(id);
+      return (byFolder.get(id) || []).length + kids(id).reduce((s, c) => s + countOf(c.id, seen), 0);
+    };
+    const row = (id, name, depth, n, { icon = 'folder', locked = false, empty = false } = {}) => {
+      const open = !locked && !treeClosed.has(id);
+      return `<div class="tree-folder${open ? ' open' : ''}${locked ? ' locked' : ''}" data-tree-folder="${id}" style="--d:${depth}">` +
+        `<span class="tree-caret">${empty ? '' : open ? '▾' : '▸'}</span>${ico(icon)}` +
+        `<span class="tree-folder-name">${escapeHtml(name)}</span><span class="tree-count">${n}</span></div>`;
+    };
+    let html = '';
+    const walk = (f, depth, seen) => {
+      if (seen.has(f.id) || depth > MAX_FOLDER_DEPTH) return;
+      seen.add(f.id);
+      const locked = isFolderLocked(f.id);
+      const n = locked ? getFolderMemoCount(f.id) : countOf(f.id);
+      if (favFilterActive && !locked && n === 0) return;   // 즐겨찾기만 볼 땐 즐겨찾기 글이 없는 폴더를 뺀다
+      const mine = locked ? [] : (byFolder.get(f.id) || []);
+      const children = locked ? [] : kids(f.id);
+      const icon = locked ? 'lock' : f.password ? 'unlock' : 'folder';
+      html += row(f.id, f.name, depth, n, { icon, locked, empty: !locked && !mine.length && !children.length });
+      if (locked || treeClosed.has(f.id)) return;
+      html += items(mine, depth);
+      children.forEach((c) => walk(c, depth + 1, seen));
+    };
+    if (currentFolder) {
+      // 폴더 하나를 고른 때: 그 폴더의 글과 하위 폴더를 바로 보여 준다(폴더 이름은 위 폴더 단추에 보인다)
+      html += items(byFolder.get(currentFolder) || [], 0);
+      const seen = new Set([currentFolder]);
+      kids(currentFolder).forEach((c) => walk(c, 1, seen));
+    } else {
+      const seen = new Set();
+      folders.filter((f) => !f.parentId && !f.dormant).sort(sortBySortOrder).forEach((f) => walk(f, 1, seen));
+      const none = byFolder.get('__none__') || [];
+      if (none.length) {
+        html += row('__none__', '미분류', 1, none.length);
+        if (!treeClosed.has('__none__')) html += items(none, 1);
+      }
+    }
+    return html;
+  };
+  const asTree = folderTreeView && !query && currentFolder !== '__none__' && folders.length > 0;
+  memoList.classList.toggle('tree-view', asTree);
+  memoList.innerHTML = asTree ? treeHtml() : filtered.map((m) => itemHtml(m)).join('') +
     (dormantHits.length ? `<div class="memo-list-divider">${ico('moon')}<span>휴면 폴더에서 찾은 글 ${dormantHits.length}</span></div>` +
       dormantHits.map((m) => itemHtml(m, ' dormant-hit')).join('') : '') +
     (query && !filtered.length && !dormantHits.length ? '<div class="memo-list-empty">찾는 글이 없습니다</div>' : '');
+
+  // 폴더별 보기: 폴더 줄을 누르면 접고 펼친다(잠긴 폴더는 비밀번호부터). 접어 둔 것은 이 기기에 기억
+  memoList.querySelectorAll('.tree-folder').forEach((el) => {
+    const id = el.dataset.treeFolder;
+    el.addEventListener('click', () => {
+      if (el.classList.contains('locked')) {
+        showPasswordPrompt(id, () => { treeClosed.delete(id); saveUiPrefs(); renderAll(); });
+        return;
+      }
+      if (treeClosed.has(id)) treeClosed.delete(id); else treeClosed.add(id);
+      saveUiPrefs();
+      renderMemoList();
+    });
+    // 진짜 폴더는 우클릭(PC)으로 폴더 관리 화면을 그 폴더에 맞춰 연다 — 폴더 목록과 같게
+    if (id !== '__none__') {
+      el.addEventListener('contextmenu', (e) => {
+        if (selectMode) return;
+        e.preventDefault();
+        openFolderManager(id);
+      });
+    }
+  });
 
   // 선택 모드: 체크박스 이벤트
   const memoItems = Array.from(memoList.querySelectorAll('.memo-item'));
