@@ -897,6 +897,12 @@ body.fm-drag-on, body.fm-drag-on * { cursor: grabbing !important; user-select: n
 }
 .memo-item:hover { background: var(--bg2); }
 .memo-item.active { background: var(--bg2); border-left: 3px solid var(--accent); }
+/* 글을 끌어 폴더에 넣기 — 끄는 동안 글자가 잡히거나(아이폰은 꾹 누르면 메뉴) 하지 않게 */
+.memo-item { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.memo-item.memo-dragging { opacity: 0.4; }
+.memo-ghost { max-width: 240px; }
+.memo-ghost span { overflow: hidden; text-overflow: ellipsis; }
+.folder-item.drop-into, .tree-folder.drop-into { background: var(--bg2); color: var(--text); box-shadow: inset 0 0 0 2px var(--accent); }
 
 .memo-item-info {
   flex: 1;

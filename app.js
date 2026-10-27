@@ -40,7 +40,7 @@ const store = {
 const MODE_QUERY = TEST_NS ? '&ns=' + encodeURIComponent(TEST_NS) + (SPLIT_SYNC ? '&split=1' : '') : '';
 
 // 이 화면의 판 번호 — 도움말 맨 아래에 보인다(휴대폰이 옛 코드로 도는지 확인용). sw.js 의 CACHE_NAME 과 함께 올린다
-const APP_VERSION = '174';
+const APP_VERSION = '175';
 
 let storageFullAt = 0;
 function onStorageFull(e) {
@@ -342,6 +342,9 @@ async function init() {
   $('#btn-backup').addEventListener('click', createBackup);
   $('#btn-folder-toggle').addEventListener('click', toggleFolderDropdown);
   $('#btn-fav-filter').addEventListener('click', toggleFavFilter);
+  memoList.addEventListener('pointerdown', onMemoPointerDown);
+  // 손가락으로 글을 끄는 동안엔 목록이 굴러가지 않게(꾹 누르기 전에 움직이면 지금처럼 굴러간다)
+  window.addEventListener('touchmove', (e) => { if (memoDrag && e.cancelable) e.preventDefault(); }, { passive: false });
   $('#btn-folder-add').addEventListener('click', showFolderDialog);
   $('#btn-folder-manage').addEventListener('click', () => openFolderManager());
   $('#btn-sync').addEventListener('click', () => {
@@ -5613,6 +5616,142 @@ function renderMemoList() {
       window.open(location.pathname + '?memo=' + id + MODE_QUERY, '_blank', 'width=400,height=700');
     });
   });
+}
+
+// ── 글을 끌어 폴더에 넣기 ──
+// 마우스는 잡고 조금 움직이면, 손가락은 0.45초 꾹 누르고 있으면 끌기가 시작된다(그냥 쓸면 지금처럼 목록이 굴러간다).
+// 놓을 곳: 위쪽 폴더 목록의 폴더·미분류, 폴더별 보기의 폴더 줄. 휴면 폴더에는 넣지 않는다(이동 단추와 같게)
+let memoDrag = null;
+
+function onMemoPointerDown(e) {
+  if (selectMode || memoDrag || e.button > 0) return;
+  const item = e.target.closest('.memo-item[data-id]');
+  if (!item || e.target.closest('.memo-item-star, .memo-item-checkbox')) return;
+  const touch = e.pointerType !== 'mouse';
+  const p = { id: item.dataset.id, item, pointerId: e.pointerId, touch, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, timer: 0 };
+  const off = () => {
+    clearTimeout(p.timer);
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', off);
+    window.removeEventListener('pointercancel', off);
+  };
+  const onMove = (ev) => {
+    if (ev.pointerId !== p.pointerId) return;
+    p.x = ev.clientX; p.y = ev.clientY;
+    if (Math.hypot(p.x - p.x0, p.y - p.y0) < (touch ? 10 : 6)) return;
+    off();
+    if (!touch) startMemoDrag(p);   // 손가락이 꾹 누르기 전에 움직였으면 굴리기다
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', off);
+  window.addEventListener('pointercancel', off);
+  if (touch) p.timer = setTimeout(() => { off(); startMemoDrag(p); }, 450);
+}
+
+function startMemoDrag(p) {
+  const memo = memos.find((m) => m.id === p.id);
+  if (!memo || selectMode || memoDrag) return;
+  const dd = $('#folder-dropdown');
+  const scroller = $('#sidebar-scroll');
+  // 폴더별 보기가 아니면 위쪽 폴더 목록을 펼쳐 놓을 곳을 보인다(놓고 나면 원래대로 접는다)
+  const openedDd = !memoList.classList.contains('tree-view') && dd.style.display === 'none';
+  if (openedDd) { dd.style.display = 'block'; scroller.scrollTop = 0; }
+  const ghost = document.createElement('div');
+  ghost.className = 'fm-ghost memo-ghost';
+  ghost.innerHTML = ico('note') + '<span>' + escapeHtml(memo.title || formatCreatedAt(memo.createdAt) + ' 새 글') + '</span>';
+  document.body.appendChild(ghost);
+  p.item.classList.add('memo-dragging');
+  // moved: 끌기가 시작된 뒤 실제로 움직였나 — 폴더 목록이 펼쳐지며 손가락 밑으로 밀려 온 폴더에, 움직이지도 않고 떼었는데 들어가지 않게
+  const d = memoDrag = { ...p, ghost, openedDd, target: null, raf: 0, sx: p.x, sy: p.y, moved: false };
+  const onMove = (ev) => {
+    if (ev.pointerId !== d.pointerId) return;
+    d.x = ev.clientX; d.y = ev.clientY;
+    if (!d.moved && Math.hypot(d.x - d.sx, d.y - d.sy) > (d.touch ? 8 : 3)) d.moved = true;
+    updateMemoDrag();
+  };
+  const onUp = (ev) => { if (ev.pointerId === d.pointerId) endMemoDrag(true); };
+  const onCancel = (ev) => { if (ev.pointerId === d.pointerId) endMemoDrag(false); };
+  const onKey = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); endMemoDrag(false); } };
+  const noMenu = (ev) => ev.preventDefault();   // 안드로이드는 꾹 누르면 메뉴 신호가 온다
+  d.off = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+    document.removeEventListener('keydown', onKey);
+    window.removeEventListener('contextmenu', noMenu, true);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('contextmenu', noMenu, true);
+  document.body.classList.add('fm-drag-on');
+  if (p.touch && navigator.vibrate) navigator.vibrate(15);
+  updateMemoDrag();
+  // 목록 위·아래 끝에 가까이 대면 저절로 굴린다(폴더 목록이 위로 밀려나 있어도 닿게)
+  const tick = () => {
+    if (memoDrag !== d) return;
+    const br = scroller.getBoundingClientRect();
+    const edge = 40;
+    let dy = 0;
+    if (d.x >= br.left && d.x <= br.right) {
+      if (d.y < br.top + edge) dy = -Math.min(20, Math.ceil((br.top + edge - d.y) / 4));
+      else if (d.y > br.bottom - edge) dy = Math.min(20, Math.ceil((d.y - (br.bottom - edge)) / 4));
+    }
+    if (dy) { scroller.scrollTop += dy; updateMemoDrag(); }
+    d.raf = requestAnimationFrame(tick);
+  };
+  d.raf = requestAnimationFrame(tick);
+}
+
+// 손가락·마우스 밑의 폴더 → { row, folder(null = 미분류) }. 지금 그 폴더에 있으면 놓을 곳이 아니다
+function memoDropTarget(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const row = el && el.closest('#folder-list .folder-item[data-folder], #memo-list .tree-folder[data-tree-folder]');
+  if (!row || row.closest('.folder-dormant-list')) return null;
+  const id = row.dataset.folder || row.dataset.treeFolder;
+  if (id === '__all__') return null;
+  const folder = id === '__none__' ? null : id;
+  if (folder && (!folders.some((f) => f.id === folder) || getDormantFolderIds().has(folder))) return null;
+  const memo = memos.find((m) => m.id === memoDrag.id);
+  if (!memo || (memo.folder || null) === folder) return null;
+  return { row, folder };
+}
+
+function updateMemoDrag() {
+  const d = memoDrag;
+  if (!d) return;
+  d.ghost.style.transform = `translate(${d.x + 14}px, ${d.y - 16}px)`;
+  const t = d.moved ? memoDropTarget(d.x, d.y) : null;
+  if (d.target && (!t || d.target.row !== t.row)) d.target.row.classList.remove('drop-into');
+  if (t) t.row.classList.add('drop-into');
+  d.target = t;
+}
+
+function endMemoDrag(commit) {
+  const d = memoDrag;
+  if (!d) return;
+  memoDrag = null;
+  d.off();
+  cancelAnimationFrame(d.raf);
+  d.ghost.remove();
+  d.item.classList.remove('memo-dragging');
+  if (d.target) d.target.row.classList.remove('drop-into');
+  document.body.classList.remove('fm-drag-on');
+  // 손을 떼며 생기는 클릭이 글을 열거나 폴더를 고르지 않게
+  const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+  window.addEventListener('click', swallow, true);
+  setTimeout(() => window.removeEventListener('click', swallow, true), 400);
+  if (d.openedDd) $('#folder-dropdown').style.display = 'none';
+  const t = commit ? d.target : null;
+  const memo = t && memos.find((m) => m.id === d.id);
+  if (!memo || (memo.folder || null) === t.folder) return;
+  setMemoFolder(memo, t.folder);
+  saveLocalData();
+  renderAll();
+  scheduleSyncToDropbox();
+  const f = t.folder && folders.find((x) => x.id === t.folder);
+  showToast(f ? `'${f.name}' 폴더로 옮겼습니다` : '미분류로 옮겼습니다');
 }
 
 // 검색어가 본문에 있으면 그 둘레 한 줄(찾은 말은 굵게) — 목록에서 어느 대목이 걸렸는지 보이게
