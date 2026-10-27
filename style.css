@@ -910,6 +910,39 @@ body.fm-drag-on, body.fm-drag-on * { cursor: grabbing !important; user-select: n
   margin-right: 2px;
 }
 
+/* 제목 왼쪽 별 단추 — 켜면 노란 ★, 안 켠 글은 연한 ☆ */
+.memo-item-star {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: -4px -4px -4px -5px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text2);
+  opacity: 0.45;
+  cursor: pointer;
+}
+.memo-item-star .ico { width: 15px; height: 15px; display: block; }
+.memo-item-star:hover { opacity: 1; color: #e6a817; }
+.memo-item-star.on { opacity: 1; color: #e6a817; }
+.memo-item-star.on .ico { fill: currentColor; }
+/* 마우스 쓰는 PC: 안 켠 ☆는 그 줄에 마우스를 올렸을 때만 보인다(자리는 비워 두어 제목 줄이 맞게) */
+@media (hover: hover) and (pointer: fine) {
+  .memo-item-star:not(.on) { opacity: 0; }
+  .memo-item:hover .memo-item-star:not(.on), .memo-item-star:focus-visible { opacity: 0.45; }
+  .memo-item .memo-item-star:not(.on):hover { opacity: 1; }
+}
+/* 손가락: 누를 자리를 넉넉히 */
+@media (pointer: coarse) {
+  .memo-item-star { width: 32px; height: 32px; margin: -7px -4px -7px -8px; }
+  .memo-item-star .ico { width: 18px; height: 18px; }
+}
+
 /* 검색: 찾은 자리 한 줄 · 휴면 폴더에서 찾은 글 */
 .memo-item-snippet {
   margin-top: 2px;

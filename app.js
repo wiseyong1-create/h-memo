@@ -40,7 +40,7 @@ const store = {
 const MODE_QUERY = TEST_NS ? '&ns=' + encodeURIComponent(TEST_NS) + (SPLIT_SYNC ? '&split=1' : '') : '';
 
 // 이 화면의 판 번호 — 도움말 맨 아래에 보인다(휴대폰이 옛 코드로 도는지 확인용). sw.js 의 CACHE_NAME 과 함께 올린다
-const APP_VERSION = '171';
+const APP_VERSION = '172';
 
 let storageFullAt = 0;
 function onStorageFull(e) {
@@ -350,7 +350,7 @@ async function init() {
   $('#btn-master-pw').addEventListener('click', showMasterPasswordDialog);
   $('#btn-master-unlock').addEventListener('click', showMasterUnlockPrompt);
   $('#btn-trash').addEventListener('click', showTrashView);
-  $('#btn-fav').addEventListener('click', toggleFavorite);
+  $('#btn-fav').addEventListener('click', () => toggleFavorite());
   $('#btn-undo').addEventListener('click', performUndo);
   $('#btn-redo').addEventListener('click', performRedo);
   // 형광펜 단추 — 누를 때 본문의 선택(블록)이 풀리지 않게 포커스를 뺏지 않는다(휴대폰엔 Alt+H 가 없다)
@@ -3464,13 +3464,14 @@ function restoreAllTrash() {
 }
 
 // ── Favorite ──
-function toggleFavorite() {
-  const memo = memos.find((m) => m.id === currentId);
+// id 를 주면 그 글(목록 제목 왼쪽의 별), 안 주면 지금 연 글(더보기의 별)
+function toggleFavorite(id = currentId) {
+  const memo = memos.find((m) => m.id === id);
   if (!memo) return;
   memo.favorite = !memo.favorite;
   memo.favoritedAt = memo.favorite ? Date.now() : null;
   memo.metaAt = Date.now();   // 다른 기기로 전달되게 (글 수정 시각은 그대로 — 목록 순서가 바뀌지 않게)
-  updateFavButton(memo);
+  if (memo.id === currentId) updateFavButton(memo);
   saveLocalData();
   renderAll();
   scheduleSyncToDropbox();
@@ -5377,7 +5378,11 @@ function renderMemoList() {
     const title = m.title || formatCreatedAt(m.createdAt) + ' 새 글';
     const date = formatDate(m.updatedAt);
     const active = m.id === currentId ? 'active' : '';
-    const favIcon = m.favorite ? '<span class="memo-item-fav">★</span>' : '';
+    // 제목 왼쪽 별 — 누르면 글을 열지 않고 바로 즐겨찾기를 켜고 끈다. 여러 글 고르기 중엔 지금처럼 ★ 표시만
+    const favIcon = selectMode
+      ? (m.favorite ? '<span class="memo-item-fav">★</span>' : '')
+      : `<button type="button" class="memo-item-star${m.favorite ? ' on' : ''}" data-star="${m.id}" aria-pressed="${!!m.favorite}" ` +
+        `title="${m.favorite ? '즐겨찾기 해제' : '즐겨찾기'}" aria-label="${m.favorite ? '즐겨찾기 해제' : '즐겨찾기'}">${ico('star')}</button>`;
     const checkbox = selectMode ? '<input type="checkbox" class="memo-item-checkbox" data-check="' + m.id + '"' + (selectedMemos.has(m.id) ? ' checked' : '') + '>' : '';
     // 검색어가 본문에 있으면 찾은 자리 둘레를 한 줄로('제목만'으로 찾을 땐 본문을 보이지 않는다)
     const snip = query && !searchTitleOnly ? searchSnippet(m, query) : '';
@@ -5460,6 +5465,7 @@ function renderMemoList() {
   memoList.querySelectorAll('.memo-item').forEach((el, idx) => {
     let clickTimer = null;
     el.addEventListener('click', (e) => {
+      if (!selectMode && e.target.closest('.memo-item-star')) { toggleFavorite(el.dataset.id); return; }
       if (selectMode) {
         // Shift+클릭 범위 선택
         if (e.shiftKey && lastCheckedMemoIndex >= 0) {
@@ -5489,8 +5495,9 @@ function renderMemoList() {
       if (clickTimer) return;
       clickTimer = setTimeout(() => { clickTimer = null; open(); }, 250);
     });
-    el.addEventListener('dblclick', () => {
-      if (selectMode) return;
+    el.addEventListener('dblclick', (e) => {
+      // 별을 빨리 두 번 눌러도 새 창이 뜨지 않게
+      if (selectMode || e.target.closest('.memo-item-star')) return;
       clearTimeout(clickTimer);
       clickTimer = null;
       const id = el.dataset.id;
